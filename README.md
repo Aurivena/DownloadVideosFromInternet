@@ -1,4 +1,4 @@
-##Supported sites
+## Supported sites
 - YouTube  
 - Vimeo  
 - Reddit (v.redd.it)  
