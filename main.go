@@ -10,18 +10,26 @@ import (
 )
 
 // The directory where the videos will be saved
-const dir = ""
+const dir = "/home/answer/Видео"
 
 // The path where the linked file is stored with urls
-const pathFile = ""
+const pathFile = "urls.txt"
 
 func main() {
-	urls := getUrls()
-
 	wg := sync.WaitGroup{}
-	wg.Add(len(urls))
 	out := make(chan string)
-	for _, url := range urls {
+	for {
+
+		url, err := getNextUrl()
+		if err != nil {
+			if err.Error() == "file is empty" {
+				break
+			}
+			log.Fatal(err)
+
+		}
+
+		wg.Add(1)
 		go func(u string) {
 			defer wg.Done()
 			download(out, u)
@@ -31,26 +39,56 @@ func main() {
 		wg.Wait()
 		close(out)
 	}()
+
 	for val := range out {
 		fmt.Println(val)
 	}
 }
 
-func getUrls() []string {
+func getNextUrl() (string, error) {
 	file, err := os.Open(pathFile)
 	if err != nil {
 		log.Fatal(err)
-		return nil
+		return "", err
 	}
-
 	defer file.Close()
 
-	var urls []string
+	// The first url in the file
+	var first string
+	// next urls for write to file
+	var nextUrls []string
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		urls = append(urls, scanner.Text())
+		if first == "" {
+			first = scanner.Text()
+			continue
+		}
+		nextUrls = append(nextUrls, scanner.Text())
 	}
-	return urls
+
+	// clear file
+	err = os.WriteFile(pathFile, []byte{}, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	f, err := os.OpenFile(pathFile, os.O_WRONLY, 0644)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	// write url in file
+	for _, line := range nextUrls {
+		_, _ = f.WriteString(line + "\n")
+	}
+
+	if first == "" {
+		return "", fmt.Errorf("file is empty")
+	}
+
+	return first, nil
 }
 
 func download(out chan<- string, url string) {
